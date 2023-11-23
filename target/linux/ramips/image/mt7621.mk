@@ -42,6 +42,73 @@ define Build/haier-sim_wr1800k-factory
   rm -rf "$@.tmp" "$@.tmp.tgz"
 endef
 
+define Build/hatlab-gateboard-combined
+  rm -fR $@.bootfs.img
+
+	mkfs.fat $@.bootfs.img -C 16384
+	mcopy -i $@.bootfs.img $(IMAGE_KERNEL) ::vmlinux.itb
+
+	( \
+		set $$(ptgen -o $@ -h 4 -s 63 -l 1024 -g -p 16M -p "${CONFIG_TARGET_ROOTFS_PARTSIZE}M" -G ${IMG_PART_DISKGUID}); \
+		BOOTFSOFFSET="$$(($$1 / 512))"; \
+		ROOTFSOFFSET="$$(($$3 / 512))"; \
+		dd if="$@.bootfs.img" of="$@" bs=512 seek="$${BOOTFSOFFSET}" conv=notrunc; \
+		dd if="${IMAGE_ROOTFS}" of="$@" bs=512 seek="$${ROOTFSOFFSET}" conv=notrunc; \
+	)
+endef
+
+define Build/hatlab-gateboard-kernel
+	rm -fR $@.initrd
+	rm -fR $@.initrd.cpio $@.initrd.cpio.gz
+
+	mkdir -p $@.initrd/{bin,dev,proc,sys,lib,etc}
+	mkdir -p $@.initrd/lib/modules/$(LINUX_VERSION)
+
+	$(CP) $(STAGING_DIR)/rdloader/bin/* $@.initrd/bin/
+  $(CP) $(STAGING_DIR)/rdloader/lib/* $@.initrd/lib/
+  $(CP) $(STAGING_DIR)/rdloader/etc/* $@.initrd/etc/
+
+  $(RSTRIP) $@.initrd/bin/
+  $(RSTRIP) $@.initrd/lib/
+
+  chmod +x $@.initrd/bin/*
+  ln -s ./bin/rdloader $@.initrd/init
+
+	( \
+		KMODS=(usb-common nls_base usbcore xhci-hcd xhci-mtk jbd2 mbcache ext4 scsi_mod usb-storage sd_mod mmc_core mmc_block mtk_sd crc32c_generic loop); \
+		for kmod in "$${KMODS[@]}"; do \
+			$(CP) \
+				$(TARGET_DIR)/lib/modules/$(LINUX_VERSION)/$$kmod.ko \
+				$@.initrd/lib/modules/$(LINUX_VERSION)/; \
+			echo /lib/modules/$(LINUX_VERSION)/$$kmod.ko \
+				>> $@.initrd/etc/rdloader_list; \
+		done; \
+	)
+
+	( \
+		if [ -f $(STAGING_DIR_HOST)/bin/cpio ]; then \
+			CPIO=$(STAGING_DIR_HOST)/bin/cpio; \
+		else \
+			CPIO="cpio"; \
+		fi; \
+		cd $@.initrd; \
+		find . | cpio -o -H newc -R 0:0 > $@.initrd.cpio; \
+	)
+
+	gzip -9 $@.initrd.cpio
+
+	$(TOPDIR)/scripts/mkits.sh \
+		-D $(DEVICE_NAME) -o $@.its -k $@ \
+		-C gzip -d $(KDIR)/image-$(DEVICE_DTS).dtb \
+		-i $@.initrd.cpio.gz \
+		-a $(KERNEL_LOADADDR) -e $(KERNEL_LOADADDR) \
+		-c config-1 -A $(LINUX_KARCH) -v $(LINUX_VERSION)
+
+	PATH=$(LINUX_DIR)/scripts/dtc:$(PATH) mkimage -f $@.its $@.new
+
+	@mv $@.new $@
+endef
+
 define Build/iodata-mstc-header
 	( \
 		data_size_crc="$$(dd if=$@ ibs=64 skip=1 2>/dev/null | gzip -c | \
@@ -1122,6 +1189,27 @@ define Device/haier_har-20s2u1
   DEVICE_MODEL := HAR-20S2U1
 endef
 TARGET_DEVICES += haier_har-20s2u1
+
+define Device/hatlab_gateboard-one
+  $(Device/dsa-migration)
+  DEVICE_VENDOR := HATLab
+  DEVICE_MODEL := GateBoard-One
+  DEVICE_PACKAGES := rdloader 8563-watchdog kmod-i2c-gpio kmod-gpio-pcf857x kmod-sdhci-mt7620 kmod-usb3 kmod-usb-storage kmod-usb-ledtrig-usbport kmod-fs-ext4 kmod-hwmon-lm75 kmod-thermal kmod-hwmon-gpiofan kmod-rtc-pcf8563 kmod-phy-realtek kmod-sfp
+  MKUBIFS_OPTS := -m 2048 -e 124KiB -c 1024
+  KERNEL := kernel-bin | gzip | hatlab-gateboard-kernel
+  IMAGE/kernel.itb := append-kernel
+  IMAGE/rootfs.img := append-rootfs
+  IMAGE/rootfs.img.gz := append-rootfs | gzip
+  IMAGE/combined.img := hatlab-gateboard-combined | append-metadata
+  IMAGE/combined.img.gz := hatlab-gateboard-combined | gzip | append-metadata
+  IMAGES := kernel.itb
+  ifeq ($(CONFIG_TARGET_IMAGES_GZIP),y)
+    IMAGES += rootfs.img.gz combined.img.gz
+  else
+    IMAGES += rootfs.img combined.img
+  endif
+endef
+TARGET_DEVICES += hatlab_gateboard-one
 
 define Device/hilink_hlk-7621a-evb
   $(Device/dsa-migration)
