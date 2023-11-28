@@ -95,12 +95,44 @@ define Build/hatlab-gateboard-kernel
 		find . | cpio -o -H newc -R 0:0 > $@.initrd.cpio; \
 	)
 
-	gzip -9 $@.initrd.cpio
+	$(TOPDIR)/scripts/mkits.sh \
+		-D $(DEVICE_NAME) -o $@.its -k $@ \
+		-C gzip -d $(KDIR)/image-$(DEVICE_DTS).dtb \
+		-i $@.initrd.cpio \
+		-a $(KERNEL_LOADADDR) -e $(KERNEL_LOADADDR) \
+		-c config-1 -A $(LINUX_KARCH) -v $(LINUX_VERSION)
+
+	PATH=$(LINUX_DIR)/scripts/dtc:$(PATH) mkimage -f $@.its $@.new
+
+	@mv $@.new $@
+endef
+
+define Build/hatlab-gateboard-kernel-zz
+	rm -fR $@.initrd
+	rm -fR $@.initrd.cpio $@.initrd.cpio.gz
+
+	mkdir -p $@.initrd/{bin,dev,proc,sys,lib,etc}
+	mkdir -p $@.initrd/lib/modules/$(LINUX_VERSION)
+
+
+  $(RSTRIP) $@.initrd/bin/
+  $(RSTRIP) $@.initrd/lib/
+
+
+	( \
+		if [ -f $(STAGING_DIR_HOST)/bin/cpio ]; then \
+			CPIO=$(STAGING_DIR_HOST)/bin/cpio; \
+		else \
+			CPIO="cpio"; \
+		fi; \
+		cd $@.initrd; \
+		find . | cpio -o -H newc -R 0:0 > $@.initrd.cpio; \
+	)
 
 	$(TOPDIR)/scripts/mkits.sh \
 		-D $(DEVICE_NAME) -o $@.its -k $@ \
 		-C gzip -d $(KDIR)/image-$(DEVICE_DTS).dtb \
-		-i $@.initrd.cpio.gz \
+		-i $@.initrd.cpio \
 		-a $(KERNEL_LOADADDR) -e $(KERNEL_LOADADDR) \
 		-c config-1 -A $(LINUX_KARCH) -v $(LINUX_VERSION)
 
@@ -1194,9 +1226,9 @@ define Device/hatlab_gateboard-one
   $(Device/dsa-migration)
   DEVICE_VENDOR := HATLab
   DEVICE_MODEL := GateBoard-One
-  DEVICE_PACKAGES := rdloader 8563-watchdog kmod-i2c-gpio kmod-gpio-pcf857x kmod-sdhci-mt7620 kmod-usb3 kmod-usb-storage kmod-usb-ledtrig-usbport kmod-fs-ext4 kmod-hwmon-lm75 kmod-thermal kmod-hwmon-gpiofan kmod-rtc-pcf8563 kmod-phy-realtek kmod-sfp
+  DEVICE_PACKAGES := 8563-watchdog kmod-i2c-gpio kmod-gpio-pcf857x kmod-sdhci-mt7620 kmod-usb3 kmod-usb-storage kmod-usb-ledtrig-usbport kmod-fs-ext4 kmod-hwmon-lm75 kmod-thermal kmod-hwmon-gpiofan kmod-rtc-pcf8563 kmod-phy-realtek kmod-sfp
   MKUBIFS_OPTS := -m 2048 -e 124KiB -c 1024
-  KERNEL := kernel-bin | gzip | hatlab-gateboard-kernel
+  KERNEL := kernel-bin | gzip | hatlab-gateboard-kernel-zz
   IMAGE/kernel.itb := append-kernel
   IMAGE/rootfs.img := append-rootfs
   IMAGE/rootfs.img.gz := append-rootfs | gzip
