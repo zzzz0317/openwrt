@@ -165,7 +165,6 @@ platform_do_upgrade() {
 	hatlab,gateboard-one)
 		CI_KERNPART="vmlinux.itb"
 		CI_UBIPART="nand0-ubi"
-
 		nand_do_upgrade "$1"
 		;;
 	*)

@@ -206,6 +206,18 @@
 			factory: partition@78000 {
 				label = "factory";
 				reg = <0x78000 0x8000>;
+
+				nvmem-layout {
+					compatible = "fixed-layout";
+					#address-cells = <1>;
+					#size-cells = <1>;
+
+					macaddr_factory_0: macaddr@0 {
+						compatible = "mac-base";
+						reg = <0x0 0x6>;
+						#nvmem-cell-cells = <1>;
+					};
+				};
 			};
 		};
 	};
@@ -280,7 +292,7 @@
 
 &gmac0 {
 	label = "dsa0";
-	nvmem-cells = <&macaddr_factory_0>;
+	nvmem-cells = <&macaddr_factory_0 0>;
 	nvmem-cell-names = "mac-address";
 	phy-mode = "trgmii";
 };
@@ -289,9 +301,8 @@
 	status = "okay";
 	label = "eth5";
 
-	nvmem-cells = <&macaddr_factory_0>;
+	nvmem-cells = <&macaddr_factory_0 6>;
 	nvmem-cell-names = "mac-address";
-	mac-address-increment = <6>;
 
 	phy-handle = <&ephy7>;
 	phy-mode = "rgmii-rxid";
@@ -302,41 +313,36 @@
 		port@0 {
 			status = "okay";
 			label = "eth0";
-			nvmem-cells = <&macaddr_factory_0>;
+			nvmem-cells = <&macaddr_factory_0 1>;
 			nvmem-cell-names = "mac-address";
-			mac-address-increment = <1>;
 		};
 
 		port@1 {
 			status = "okay";
 			label = "eth1";
-			nvmem-cells = <&macaddr_factory_0>;
+			nvmem-cells = <&macaddr_factory_0 2>;
 			nvmem-cell-names = "mac-address";
-			mac-address-increment = <2>;
 		};
 
 		port@2 {
 			status = "okay";
 			label = "eth2";
-			nvmem-cells = <&macaddr_factory_0>;
+			nvmem-cells = <&macaddr_factory_0 3>;
 			nvmem-cell-names = "mac-address";
-			mac-address-increment = <3>;
 		};
 
 		port@3 {
 			status = "okay";
 			label = "eth3";
-			nvmem-cells = <&macaddr_factory_0>;
+			nvmem-cells = <&macaddr_factory_0 4>;
 			nvmem-cell-names = "mac-address";
-			mac-address-increment = <4>;
 		};
 
 		port@4 {
 			status = "okay";
 			label = "eth4";
-			nvmem-cells = <&macaddr_factory_0>;
+			nvmem-cells = <&macaddr_factory_0 5>;
 			nvmem-cell-names = "mac-address";
-			mac-address-increment = <5>;
 		};
 	};
 };
@@ -375,16 +381,5 @@
 		compatible = "national,lm75";
 		reg = <0x4f>;
 		#thermal-sensor-cells = <0>;
-	};
-};
-
-&factory {
-	compatible = "nvmem-cells";
-	#address-cells = <1>;
-	#size-cells = <1>;
-	#mtd-mac-address = <&factory 0x0>;
-
-	macaddr_factory_0: macaddr@0 {
-		reg = <0x0 0x6>;
 	};
 };
